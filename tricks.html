@@ -1,0 +1,24 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tricks</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><p>Bayes文本分类的tricks：</p>
+<blockquote>
+<p>概率相乘可以取对数然后相加，能够降低计算开销，不容易损失精度。工业级可以建立hash表存储各个值的对数，时间复杂度O（1）就可以得到计算结果。<br>
+还有一个可以用来关键词选择。<br>
+<img src="https://img-blog.csdnimg.cn/20190712105005319.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+这里可以解释为，需要判断输入是C还是C_，那么就考虑每个词对于是C的贡献大还是C_的贡献大，每项的值越大，就说明对某类的决策贡献越大。</p>
+</blockquote>
+<p>这里再对上面的2做一点延伸。个人考虑这种方法可以对数据进行特征选择，拿二分类为例，上面的每个词在数据中就是特征，每个特征可能对应着很多个离散值，这个离散值之间应该是可以做独立性假设的即P(A|S)=P(A=1|S)*P(A=2|S)…*P(A=N|S)，N表示A特征可取的离散值。得到的P(A|S)/P(A|H)就是二分类中特征的权重，这个权重是基于统计得出的，可以用来选择特征。（多分类中应该把S和H换为C和C的逆，C的逆是其他的分类的乘积，然后通过迭代后平均计算或者加权计算？）朴素贝叶斯是依赖独立性假设的，所以在实际使用中应该需要PCA先降维。<br>
+特征选择的方法还有：卡方检验、信息熵信息增益等。后面会再总结。</p>
+</div>
+</body>
+
+</html>

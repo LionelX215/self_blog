@@ -1,0 +1,97 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>语言模型 NNLM</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><p>模型参数调整的空间不是很大，看了看数据维度、层数、过拟合、初始化什么的，操作空间不是很大感觉。因此觉得模型可以先用了，在下一步要开始调整数据预处理部分了，因为分词和词向量用的还是比较弱的。</p>
+<h1><a id="_1"></a>语言模型预训练方法</h1>
+<h4><a id="_2"></a>语言模型</h4>
+<blockquote>
+<p>参考 https://www.cnblogs.com/robert-dlut/p/9824346.html 自然语言处理中的语言模型预训练方法（ELMo、GPT和BERT）<br>
+参考 https://www.jianshu.com/p/471d9bfbd72f<br>
+参考 https://www.bilibili.com/video/av46561029/?p=61</p>
+</blockquote>
+<p>  语言模型就是序列词的概率分布，通过前词去判定后词出现的概率。当词量很多时很难预测，所以一般用n-gram，即邻近n个去判定。为了解决稀疏问题(one-hot)，有人提出了用NN做，发现第一层的参数稠密且含有语义信息，也为word2vec打下了基础。<br>
+  预训练模型的参数不再是随机初始化，而是先有一个任务进行训练得到一套模型参数，然后用这套参数对模型进行初始化，再进行训练。词向量也可以看成是第一层word embedding进行了预训练。<br>
+<img src="https://img-blog.csdnimg.cn/20190627135751218.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+1 输入层：上下文单词的onehot.  {假设单词向量空间dim为V，上下文单词个数为C}<br>
+2 所有onehot分别乘以共享的输入权重矩阵W. {VN矩阵，N为自己设定的数，初始化权重矩阵W}<br>
+3 所得的向量 {因为是onehot所以为向量} 相加求平均作为隐层向量, size为1N.<br>
+4 乘以输出权重矩阵W’ {NV}<br>
+5 得到向量 {1V} 激活函数处理得到V-dim概率分布  {PS: 因为是onehot嘛，其中的每一维斗代表着一个单词}<br>
+6 概率最大的index所指示的单词为预测出的中间词（target word）与true label的onehot做比较，误差越小越好（根据误差更新权重矩阵）。所以，需要定义loss function（一般为交叉熵代价函数），采用梯度下降算法更新W和W’。训练完毕后，输入层的每个单词与矩阵W相乘得到的向量的就是我们想要的词向量（word embedding），这个矩阵（所有单词的word embedding）也叫做look up table（这个look up table就是矩阵W自身），也就是说，任何一个单词的onehot乘以这个矩阵都将得到自己的词向量。有了look up table就可以免去训练过程直接查表得到单词的词向量了。<br>
+<br></p>
+<h4><a id="ELMo_18"></a>ELMo</h4>
+<blockquote>
+<p>参考 https://cloud.tencent.com/developer/article/1422265<br>
+参考 https://blog.csdn.net/triplemeng/article/details/82380202 ELMo算法介绍</p>
+</blockquote>
+<p>  来自《Deep Contextualized Word Representations》，NAACL 2018。提出预训练的词向量应该包括句法和语义信息，并且能够对多义词建模。而传统的word2vec是做不到的，比如中文“门槛”，可以表示实物，也可以表示抽象，然而在word2vec中，只会有一个向量。ELMo的主要做法是先训练一个完整的语言模型，再用这个语言模型去处理需要训练的文本，生成相应的词向量，所以在文中一直强调ELMo的模型对同一个字在不同句子中能生成不同的词向量。考虑内存占用应该会很大？因为相同词汇在不同句子中出现就会产生不同的词向量。</p>
+<p>ELMo用多层的BiLSTM语言模型，想训练出多层次的文本表示，对于每一层，都是一个embedding，在最后应用于down stream tasks时，把几个embedding加权求和，权重是根据tasks学习的，在文章中有做一些测试说明权重在不同类型的任务中大致分布：<br>
+<img src="https://img-blog.csdnimg.cn/20190627145234469.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+可认为，低层特征表示是词语级别的特征，中层特征表示是句法级别的特征、高层特征表示是语义级别的特征。 各层的表示向量为：<br>
+<img src="https://img-blog.csdnimg.cn/20190627145315246.png" alt="在这里插入图片描述"><br>
+L表示层，k表示tokens。<br>
+<img src="https://img-blog.csdnimg.cn/20190627145649968.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+注意上图的下半部分：对于特定的下游任务，ELMo将学习组合这些表示的权重。在进行有监督的NLP任务时，可以将ELMo直接当做特征拼接到具体任务模型的词向量输入或者是模型的最高层表示上。总结一下，不像传统的词向量，每一个词只对应一个词向量，ELMo利用预训练好的双向语言模型，然后根据具体输入从该语言模型中可以得到上下文依赖的当前词表示（对于不同上下文的同一个词的表示是不一样的），再当成特征加入到具体的NLP有监督模型里。<br>
+  这个要标记一下，后面尝试实现一下。<br>
+<br></p>
+<h4><a id="Open_AI_GPT_34"></a>Open AI GPT</h4>
+<p>来自open AI团队的文章《Improving Language Understanding by Generative Pre-Training》，目标是学习一个通用的表示，能够在大量任务上进行应用。这篇论文的亮点主要在于，他们利用了Transformer网络代替了LSTM作为语言模型来更好的捕获长距离语言结构。然后在进行具体任务有监督微调时使用了语言模型作为附属任务训练目标。<br>
+  得到预训练模型，根据具体NLP任务有监督微调时，与ELMo当成特征的做法不同，OpenAI GPT不需要再重新对任务构建新的模型结构，而是直接在transformer这个语言模型上的最后一层接上softmax作为任务输出层，然后再对这整个模型进行微调。他们额外发现，如果使用语言模型作为辅助任务，能够提升有监督模型的泛化能力，并且能够加速收敛。<br>
+  elmo是的用法和word2vec差不多，只不过是用语言模型生成的动态vec再输入到原有的model（解决之前task的model）中去。但是OpenAI GPT的supervised fine-tuning这个指的是直接用transformer fine-tuning之后的模型就能直接完成特定的task 而不是要像word2vec和elmo输入到之前的model中去。<br>
+<img src="https://img-blog.csdnimg.cn/20190627154703936.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+OpenAI GPT的效果要比ELMo的效果更好。从下面的消除实验来看，在去掉预训练部分后，所有任务都大幅下降，平均下降了14.8%，说明预训练很有效；在大数据集上使用语言模型作为附加任务的效果更好，小数据集不然；利用LSTM代替Transformer后，结果平均下降了5.6%，也体现了Transformer的性能。<br>
+GPT的核心就是Transformer的Decoder，计算如下图所示。</p>
+<p><img src="https://img-blog.csdnimg.cn/20190628112047542.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+<img src="https://img-blog.csdnimg.cn/20190628105442828.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+GPT-2的模型非常大，比BERT大五六倍。GPT-2效果最好的最出名的功能就是写作，给出一段文字，GPT-2可以帮你完成正片文章的写作。</p>
+<br>
+<h4><a id="BERTBidirectional_Encoder_Representations_from_Transformers_48"></a>BERT（Bidirectional Encoder Representations from Transformers）</h4>
+<p>《BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding》由google团队2018年发表。</p>
+<blockquote>
+<p>BERT = Encoder of Transformer			learned from a large amount of text without annotation</p>
+</blockquote>
+<p>BERT的核心是Transformer中的Encoder，Encoder的训练不需要label，无监督的输入预料就可以。<br>
+<img src="https://img-blog.csdnimg.cn/20190627195243407.png" alt="在这里插入图片描述"><br>
+BERT的训练有两种方法：</p>
+<ul>
+<li>Masked LM：把所有的句子中，15%的词汇置换成一个特殊的token，即[MASK]。也就是会gaidiao句子中15%的词汇，BERT的任务就是猜测[MASK]应该是什么。训练时将tokens正常输入，包括MASK，然后输出embedding，MASK对应的embedding输入到一个线性多分类器，分类器用来输出预测被MASK的词汇是哪一个。</li>
+</ul>
+<p><img src="https://img-blog.csdnimg.cn/20190627195833763.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><img src="https://img-blog.csdnimg.cn/20190627195901445.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"></p>
+<ul>
+<li>Next Sentence Prediction：输入两个句子，然后要判断两个句子是接在一起的还是不接在一起的。[SEP]是一个需要输入的特殊符号，表示两个句子的边界。[CLS]也是一个特殊的token，表示要做分类，从CLS输出的embedding输入到一个线性二分类器，输出是否是要接在一起的。其实分析一下，CLS放在开头的合理性，因为BERT的核心是Transformer的Encoder实现的（self-attention），相邻的word和不相邻的word对他的训练来说都是一样的，所以放在开头或者结尾的影响是不大的。而如果是RNN，那么放在尾部更合理，因为读完整个句子之后再做分类。</li>
+</ul>
+<p><img src="https://img-blog.csdnimg.cn/20190628093300849.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+文章中是要求Approaches 1 和 2 同时训练的，当对两个同时训练，BERT写到的效果最好。</p>
+<p>预训练好的BERT怎么使用？<br>
+paper中有四个方案，不是只能像Elmo一样，将学好的作为embedding特征，直接和down stream task一起训练。BERT是将训练好的model和down stream tasks一起训练。<br>
+case 1: input —&gt; single sentence		output —&gt; class<br>
+情感分析，文档分类。 线性分类器要初始化从头学，BERT只需要fine-tune就可以了。<br>
+<img src="https://img-blog.csdnimg.cn/20190628095657295.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+case 2: input —&gt; single sentence		output —&gt; class of each word<br>
+词性标注。  每个word都输出一个vector，经过分类器，输出每个词的词性。同样也是classify从头学，BERT需要finr-tune。</p>
+<p><img src="https://img-blog.csdnimg.cn/20190628100101447.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+case 3: input —&gt; two sentence		output —&gt; class<br>
+自然语言推断（给一个前提条件，判断一个假设是否成立）。这种分类只有三种，是/否/无法判断。</p>
+<p><img src="https://img-blog.csdnimg.cn/20190628100746345.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"></p>
+<p>case 4：input —&gt; Document   Query 		output —&gt; two integers<br>
+Extraction-based Question Answering(QA)<br>
+问答，这种是答案在文档中找，而不是用新的可能文档中没出现的词。最终输出的是两个数字s和e，问题的答案就是文章中第s个token到第e个token。<br>
+<img src="https://img-blog.csdnimg.cn/20190628101308193.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+<img src="https://img-blog.csdnimg.cn/20190628102252353.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+从BERT中文章的输出，设定两个和输出embedding相同维度的vector和文章中的每个输出做点积，经过softmax得到分数，第一个vector最终softmax的位置就是s的位置，第二个vector就是e的位置。如果得到的s比e大，比如s=5，e=2，并不是说明模型出错了，而是答案为“此题无解”，因为是三分类的，在文章中无解在很多问题中是正确的解，给出了解反而不对。</p>
+<p><img src="https://img-blog.csdnimg.cn/20190628102539878.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"></p>
+<p>&lt;br / &gt;</p>
+<h4><a id="END_89"></a>END</h4>
+<p>大概就是这样了，后面会尽量都实现了看一下，之后在实现学到没写的细节会再来补充。</p>
+</div>
+</body>
+
+</html>

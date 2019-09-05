@@ -1,0 +1,133 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BERT代码解读---tokenization文件</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1><a id="BERTtokenization_0"></a>BERT代码解读—tokenization文件</h1>
+<p>主要有三个class：BasicTokenizer、WordpieceTokenizer、FullTokenizer以及常用函数。<br>
+常用函数：</p>
+<h4><a id="validate_case_matches_checpoint_3"></a>validate_case_matches_checpoint</h4>
+<pre><code class="prism language-python"><span class="token keyword">def</span> <span class="token function">validate_case_matches_checkpoint</span><span class="token punctuation">(</span>do_lower_case<span class="token punctuation">,</span> init_checkpoint<span class="token punctuation">)</span><span class="token punctuation">:</span>
+  <span class="token triple-quoted-string string">"""Checks whether the casing config is consistent with the checkpoint name."""</span>
+
+  <span class="token comment"># The casing has to be passed in by the user and there is no explicit check</span>
+  <span class="token comment"># as to whether it matches the checkpoint. The casing information probably</span>
+  <span class="token comment"># should have been stored in the bert_config.json file, but it's not, so</span>
+  <span class="token comment"># we have to heuristically detect it to validate.</span>
+
+  <span class="token keyword">if</span> <span class="token operator">not</span> init_checkpoint<span class="token punctuation">:</span>
+    <span class="token keyword">return</span>
+
+  m <span class="token operator">=</span> re<span class="token punctuation">.</span>match<span class="token punctuation">(</span><span class="token string">"^.*?([A-Za-z0-9_-]+)/bert_model.ckpt"</span><span class="token punctuation">,</span> init_checkpoint<span class="token punctuation">)</span>
+  <span class="token keyword">if</span> m <span class="token keyword">is</span> <span class="token boolean">None</span><span class="token punctuation">:</span>
+    <span class="token keyword">return</span>
+
+  model_name <span class="token operator">=</span> m<span class="token punctuation">.</span>group<span class="token punctuation">(</span><span class="token number">1</span><span class="token punctuation">)</span>
+
+  lower_models <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token string">"uncased_L-24_H-1024_A-16"</span><span class="token punctuation">,</span> <span class="token string">"uncased_L-12_H-768_A-12"</span><span class="token punctuation">,</span>
+      <span class="token string">"multilingual_L-12_H-768_A-12"</span><span class="token punctuation">,</span> <span class="token string">"chinese_L-12_H-768_A-12"</span>
+  <span class="token punctuation">]</span>
+
+  cased_models <span class="token operator">=</span> <span class="token punctuation">[</span>
+      <span class="token string">"cased_L-12_H-768_A-12"</span><span class="token punctuation">,</span> <span class="token string">"cased_L-24_H-1024_A-16"</span><span class="token punctuation">,</span>
+      <span class="token string">"multi_cased_L-12_H-768_A-12"</span>
+  <span class="token punctuation">]</span>
+
+  is_bad_config <span class="token operator">=</span> <span class="token boolean">False</span>
+  <span class="token keyword">if</span> model_name <span class="token keyword">in</span> lower_models <span class="token operator">and</span> <span class="token operator">not</span> do_lower_case<span class="token punctuation">:</span>
+    is_bad_config <span class="token operator">=</span> <span class="token boolean">True</span>
+    actual_flag <span class="token operator">=</span> <span class="token string">"False"</span>
+    case_name <span class="token operator">=</span> <span class="token string">"lowercased"</span>
+    opposite_flag <span class="token operator">=</span> <span class="token string">"True"</span>
+
+  <span class="token keyword">if</span> model_name <span class="token keyword">in</span> cased_models <span class="token operator">and</span> do_lower_case<span class="token punctuation">:</span>
+    is_bad_config <span class="token operator">=</span> <span class="token boolean">True</span>
+    actual_flag <span class="token operator">=</span> <span class="token string">"True"</span>
+    case_name <span class="token operator">=</span> <span class="token string">"cased"</span>
+    opposite_flag <span class="token operator">=</span> <span class="token string">"False"</span>
+
+  <span class="token keyword">if</span> is_bad_config<span class="token punctuation">:</span>
+    <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span>
+        <span class="token string">"You passed in `--do_lower_case=%s` with `--init_checkpoint=%s`. "</span>
+        <span class="token string">"However, `%s` seems to be a %s model, so you "</span>
+        <span class="token string">"should pass in `--do_lower_case=%s` so that the fine-tuning matches "</span>
+        <span class="token string">"how the model was pre-training. If this error is wrong, please "</span>
+        <span class="token string">"just comment out this check."</span> <span class="token operator">%</span> <span class="token punctuation">(</span>actual_flag<span class="token punctuation">,</span> init_checkpoint<span class="token punctuation">,</span>
+                                          model_name<span class="token punctuation">,</span> case_name<span class="token punctuation">,</span> opposite_flag<span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre>
+<p>检查建模的参数与checkpoint的参数是否一致。<br>
+<br></p>
+<h4><a id="convert_to_unicode_57"></a>convert_to_unicode</h4>
+<pre><code class="prism language-python"><span class="token keyword">def</span> <span class="token function">convert_to_unicode</span><span class="token punctuation">(</span>text<span class="token punctuation">)</span><span class="token punctuation">:</span>
+  <span class="token triple-quoted-string string">"""Converts `text` to Unicode (if it's not already), assuming utf-8 input."""</span>
+  <span class="token keyword">if</span> six<span class="token punctuation">.</span>PY3<span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+      <span class="token keyword">return</span> text
+    <span class="token keyword">elif</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> <span class="token builtin">bytes</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+      <span class="token keyword">return</span> text<span class="token punctuation">.</span>decode<span class="token punctuation">(</span><span class="token string">"utf-8"</span><span class="token punctuation">,</span> <span class="token string">"ignore"</span><span class="token punctuation">)</span>
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+      <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"Unsupported string type: %s"</span> <span class="token operator">%</span> <span class="token punctuation">(</span><span class="token builtin">type</span><span class="token punctuation">(</span>text<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token keyword">elif</span> six<span class="token punctuation">.</span>PY2<span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+      <span class="token keyword">return</span> text<span class="token punctuation">.</span>decode<span class="token punctuation">(</span><span class="token string">"utf-8"</span><span class="token punctuation">,</span> <span class="token string">"ignore"</span><span class="token punctuation">)</span>
+    <span class="token keyword">elif</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> <span class="token builtin">unicode</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+      <span class="token keyword">return</span> text
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+      <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"Unsupported string type: %s"</span> <span class="token operator">%</span> <span class="token punctuation">(</span><span class="token builtin">type</span><span class="token punctuation">(</span>text<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token keyword">else</span><span class="token punctuation">:</span>
+    <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"Not running on Python2 or Python 3?"</span><span class="token punctuation">)</span>
+</code></pre>
+<p>从utf-8转为unicode。six模块是用来解决python2和python3的兼容问题的。<br>
+<br></p>
+<h4><a id="printable_text_81"></a>printable_text</h4>
+<pre><code class="prism language-python"><span class="token keyword">def</span> <span class="token function">printable_text</span><span class="token punctuation">(</span>text<span class="token punctuation">)</span><span class="token punctuation">:</span>
+  <span class="token triple-quoted-string string">"""Returns text encoded in a way suitable for print or `tf.logging`."""</span>
+
+  <span class="token comment"># These functions want `str` for both Python2 and Python3, but in one case</span>
+  <span class="token comment"># it's a Unicode string and in the other it's a byte string.</span>
+  <span class="token keyword">if</span> six<span class="token punctuation">.</span>PY3<span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+      <span class="token keyword">return</span> text
+    <span class="token keyword">elif</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> <span class="token builtin">bytes</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+      <span class="token keyword">return</span> text<span class="token punctuation">.</span>decode<span class="token punctuation">(</span><span class="token string">"utf-8"</span><span class="token punctuation">,</span> <span class="token string">"ignore"</span><span class="token punctuation">)</span>
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+      <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"Unsupported string type: %s"</span> <span class="token operator">%</span> <span class="token punctuation">(</span><span class="token builtin">type</span><span class="token punctuation">(</span>text<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token keyword">elif</span> six<span class="token punctuation">.</span>PY2<span class="token punctuation">:</span>
+    <span class="token keyword">if</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> <span class="token builtin">str</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+      <span class="token keyword">return</span> text
+    <span class="token keyword">elif</span> <span class="token builtin">isinstance</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> <span class="token builtin">unicode</span><span class="token punctuation">)</span><span class="token punctuation">:</span>
+      <span class="token keyword">return</span> text<span class="token punctuation">.</span>encode<span class="token punctuation">(</span><span class="token string">"utf-8"</span><span class="token punctuation">)</span>
+    <span class="token keyword">else</span><span class="token punctuation">:</span>
+      <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"Unsupported string type: %s"</span> <span class="token operator">%</span> <span class="token punctuation">(</span><span class="token builtin">type</span><span class="token punctuation">(</span>text<span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token keyword">else</span><span class="token punctuation">:</span>
+    <span class="token keyword">raise</span> ValueError<span class="token punctuation">(</span><span class="token string">"Not running on Python2 or Python 3?"</span><span class="token punctuation">)</span>
+</code></pre>
+<p>将输入变成tf.logging可以打印的类型：如果是python3，那就是str或者unicode。tf.logging是记录训练的日志，若干批次训练后的loss、accuracy等信息。<br>
+<br></p>
+<h4><a id="load_vocab_108"></a>load_vocab</h4>
+<pre><code class="prism language-python"><span class="token keyword">def</span> <span class="token function">load_vocab</span><span class="token punctuation">(</span>vocab_file<span class="token punctuation">)</span><span class="token punctuation">:</span>
+  <span class="token triple-quoted-string string">"""Loads a vocabulary file into a dictionary."""</span>
+  vocab <span class="token operator">=</span> collections<span class="token punctuation">.</span>OrderedDict<span class="token punctuation">(</span><span class="token punctuation">)</span>
+  index <span class="token operator">=</span> <span class="token number">0</span>
+  <span class="token keyword">with</span> tf<span class="token punctuation">.</span>gfile<span class="token punctuation">.</span>GFile<span class="token punctuation">(</span>vocab_file<span class="token punctuation">,</span> <span class="token string">"r"</span><span class="token punctuation">)</span> <span class="token keyword">as</span> reader<span class="token punctuation">:</span>
+    <span class="token keyword">while</span> <span class="token boolean">True</span><span class="token punctuation">:</span>
+      token <span class="token operator">=</span> convert_to_unicode<span class="token punctuation">(</span>reader<span class="token punctuation">.</span>readline<span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+      <span class="token keyword">if</span> <span class="token operator">not</span> token<span class="token punctuation">:</span>
+        <span class="token keyword">break</span>
+      token <span class="token operator">=</span> token<span class="token punctuation">.</span>strip<span class="token punctuation">(</span><span class="token punctuation">)</span>
+      vocab<span class="token punctuation">[</span>token<span class="token punctuation">]</span> <span class="token operator">=</span> index
+      index <span class="token operator">+=</span> <span class="token number">1</span>
+  <span class="token keyword">return</span> vocab
+</code></pre>
+<p>加载vocab，每行都是一个词，转为unicode，行号是词的id。collections.OrderdDict也是创建字典，不过会按照添加的顺序固定顺序。</p>
+</div>
+</body>
+
+</html>

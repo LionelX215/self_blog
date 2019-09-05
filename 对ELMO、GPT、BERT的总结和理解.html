@@ -1,0 +1,36 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>对ELMO、GPT、BERT的总结和理解</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><h1><a id="ELMOGPTBERT_0"></a>对ELMO、GPT、BERT的总结和理解</h1>
+<p>这几天看了ELMO、GPT、BERT和Transformer，对原理也算是有了一些理解，但是每次在自己思考的时候总觉得有点迷糊，几天看了一篇博客，感觉写的太棒了，把之前看的内容总算是串了起来了，在这做个记录，加深理解。</p>
+<blockquote>
+<p>先po出来博客的地址，给博主点100个赞。<br>
+https://www.jianshu.com/p/109505d2947a</p>
+</blockquote>
+<p>首先是ELMo，对于word2vec最大的不足就是在于多义词，一个词只有一个向量，而一个词本身在不同的语境下会有多种语义，word2vec并没有办法做到多个表达，ELMo的思想是得到embedding后，载入到不同的LSTM网络中在利用语句学习，因为多义词的词义总是体现在上下文的语境中。这样，在每个词有word2vec的基础上，又根据语境产生了变化，学习到了新的词义。</p>
+<p><img src="https://img-blog.csdnimg.cn/20190701092914842.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+思路就是：embedding不再仅仅嵌入词语特征，还嵌入lstm通过大量网络学习到的参数特征，词向量和lstm学习到的权重一起嵌入到下游任务。ELMo的使用方法如下图：<br>
+<img src="https://img-blog.csdnimg.cn/20190701093403631.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+GPT用的是Transformer中的Decoder部分。训练思路和NNLM一样，利用前n-1个词预测第n个词向量。</p>
+<p>BERT的核心结构使用的是Transformer中的Encoder结构，这与Decoder最大的区别就在于Masked attention，因为解码过程中，attention的时候不能给词语看到未来的信息，个人理解，在此处的masked就意味着在计算i的输出时，i以后的时刻的v值为0。即：<br>
+<img src="https://img-blog.csdnimg.cn/20190701100635906.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+<img src="https://img-blog.csdnimg.cn/20190701100639950.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+这就是为何说ELMo和GPT都是单向的，而BERT是双向的。<br>
+BERT的训练是预测15%替换的词，label是替换的词（按照一定的规则变为mask）。以及预测两段文本是否是链接的（这里对语料的结构有新的要求）。<br>
+<img src="https://img-blog.csdnimg.cn/20190701101238771.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+<img src="https://img-blog.csdnimg.cn/20190701101247166.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+segment embeddings指的是上下文语句训练。为什么说BERT是双向的，其实就是attention的叠加方向是双向。</p>
+<p>word2vec模型中，W的维度是固定的N*V   N表示词向量维度，V表示单词的个数，即one-hot个数，因此通过神经网络训练的一直是这个W矩阵。而BERT内部不是个神经网络，是self-attention模型，self-attention模型并不能像W一样直接对词输出词向量，需要经过BERT网络才能得到词的词向量，这样也就造成了当输入的句子不同时，某个词的词向量经过参考了周围词的计算结果（因为要有点积计算），产生的embedding（输出）也不同。<br>
+输出之后产生的结果经过softmax或者其他的弱分类器，完成下层的任务，弱分类器都是没有学习过的，通过实际的下层任务，弱分类器从头学习，BERT进行fine-tune。</p>
+</div>
+</body>
+
+</html>

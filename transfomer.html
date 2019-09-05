@@ -1,0 +1,80 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>实习学习日志day07-----------------NLP部分</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><p>  昨天看Transformer这篇文章的结构，看的有点云里雾里，而且昨天也到了下班时间，回去也没继续看了。今天先接着把这篇文章的内容看完，然后可能会找找源码看看，试试能不能移植过来。OK，开始看啦。</p>
+<h1><a id="TransformerAttention_is_All_You_Need_2"></a>Transformer（“Attention is All You Need”）</h1>
+<p>  Attention is All You Need是google团队2017年发表的一篇文章，提出的方法是在seq2seq上的创新，本质上来说，都是抛弃了 RNN 结构来做 Seq2Seq 任务。 一般深度学习进行NLP的方法都是RNN或者CNN，google团队提出了第三个思路，纯Attention，单靠注意力就可以。<sup class="footnote-ref"><a href="#fn1" id="fnref1">1</a></sup> RNN用于NLP不好的地方在于不能并行，且就算是双向LSTM也不能那么好的去解决长时间依赖问题。而CNN可以并行执行，并且可以通过kernel得到邻居信息，但是远距离信息只能通过加深深度获得，如果浅层就想获得远距离信息，是没办法做到的。因此提出了一种新的解决方案，就是用于Transformer中的self-attention layer。<br>
+  Transformer大致可以分为两个部分，Encoders和Decoders（很像seq2seq）<sup class="footnote-ref"><a href="#fn2" id="fnref2">2</a></sup>：<br>
+<img src="https://img-blog.csdnimg.cn/20190625101653315.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+在内部都包含了6个小块：<br>
+<img src="https://img-blog.csdnimg.cn/20190625101745940.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+每个encoder都是相同的，都包含了一个self attention层和一个前馈神经网络。每个decoder也是类似的，但是decoder中这两层中间还有一个attention层，帮助decoder专注于与输入句子中对应的那个单词（类似与seq2seq models的结构）<br>
+：<br>
+<img src="https://img-blog.csdnimg.cn/20190625102303104.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+Attention的结构如下图：<br>
+<img src="https://img-blog.csdnimg.cn/20190625102757185.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"></p>
+<p>每一个encoder的结构如下图。<br>
+<img src="https://img-blog.csdnimg.cn/20190625103145379.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"></p>
+<h4><a id="SelfAttention_16"></a>Self-Attention</h4>
+<p>首先，Q(Query)、K(Key)、V(Value)是训练过程中创建的三个向量，假设输入的单词经过embedding后的维度为512，X与三个向量分别相乘，得到q、k、v三个向量(这里是向量是为了方便理解，实际都是矩阵，即每一行都代表一个词，实际的是n行的，n是句子中的单词数)。得到的向量比原输入的维度小，此处是64。<br>
+<img src="https://img-blog.csdnimg.cn/20190625103327454.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+<img src="https://img-blog.csdnimg.cn/2019062510511456.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+得到三个向量后的计算过程表示为：<img src="https://img-blog.csdnimg.cn/20190625105234860.png" alt="在这里插入图片描述"><br>
+<img src="https://img-blog.csdnimg.cn/20190625105224542.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+这里要提醒的一下的是，encoder之间参数是不共享的，并且W、K、V矩阵的参数也不是共享的，是在每个都encoder前都创建了。自此，就完成了self attention内部的计算过程。</p>
+<br>
+<h4><a id="MultiHead_Attention_26"></a>Multi-Head Attention</h4>
+<p>  这是对Attention机制的一种完善，其实很好理解，就是每层不再是创建一组Q、K、V而是创建多组（文章中8组），每个矩阵都是随机初始化生成的。然后通过训练，用于将词嵌入（或者来自较低Encoder/Decoder的矢量）投影到不同的“representation subspaces（表示子空间）”中。这是为了增加Attention的表达能力。<br>
+  经过此过程后最后输出的是8个Z，即Z_0，Z_1…Z_7，通过对8个矩阵的拼接就能够输入到前馈神经网络中：<br>
+<img src="https://img-blog.csdnimg.cn/20190625111404598.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+完整过程：<br>
+<img src="https://img-blog.csdnimg.cn/20190625111436867.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+Multi-Head操作从形式上来看，就是对Q、K、V矩阵通过参数矩阵进行投影，然后Attention后再拼接到一起。<br>
+<br></p>
+<h4><a id="Position_Embedding_35"></a>Position Embedding</h4>
+<p>  至此，还有一个重要的问题没有结局：输入输出顺序。在现在的方法中，没有包含位置信息，即如果把输入句子的语序打乱然后输入，Attention得到的是相同的结果（比如机器翻译中，有可能只把每个词都翻译出来了，但是不能组织成合理的句子）。所以引入了Position Embedding处理。<br>
+<img src="https://img-blog.csdnimg.cn/20190625113339521.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+对输入的词向量增添位置信息，这样Q、K、V等矩阵中会与X点积，也会包含位置信息。<br>
+<img src="https://img-blog.csdnimg.cn/20190625113450471.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+位置信息的创建方法是如这张图所示，每一行表示一个位置信息，一共512列，与输入的维度匹配。这是一个20个字（行）的（512）列位置编码示例。你会发现它咋中心位置被分为了2半，这是因为左半部分的值是一由一个正弦函数生成的，而右半部分是由另一个函数（余弦）生成。然后将它们连接起来形成每个位置编码矢量。这不是唯一的位置表示方法，然而，它具有能够扩展到看不见的序列长度的优点。<br>
+  Position Embedding 的公式：<br>
+<img src="https://img-blog.csdnimg.cn/20190625113613797.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+位置向量和词向量的结合有几个可选方案，可以把它们拼接起来作为一个新向量，也可以把位置向量定义为跟词向量一样大小，然后两者加起来。FaceBook 的论文用的是前者，而 Google 论文中用的是后者。直觉上相加会导致信息损失，似乎不可取，但 Google 的成果说明相加也是很好的方案。</p>
+<br>
+<h4><a id="Residuals_47"></a>Residuals</h4>
+<p>self attention的链接情况：<br>
+<img src="https://img-blog.csdnimg.cn/20190625114231340.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+Decoder的子层也是同样的，如果我们想做堆叠了2个Encoder和2个Decoder的Transformer，那么它可视化就会如下图所示：<br>
+<img src="https://img-blog.csdnimg.cn/20190625114335387.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+<br></p>
+<h4><a id="Else_54"></a>Else</h4>
+<p>还有最后的线性层和softmax层，以及Loss的设置，在参考1中可以查看细节，暂时不记录了，代码需要的时候再查看。</p>
+<blockquote>
+<p>Transformer代码实现机器翻译 ：https://blog.csdn.net/mijiaoxiaosan/article/details/74909076</p>
+</blockquote>
+<br>
+<p>下班了，回到住处九点半，每次加完班都感觉离变成大牛又近了一步哈哈哈哈。今天看了大半天的Transformer，发现这个模型主要还是作为机器翻译，可能还是不太适合目前的项目，况且对我这个菜鸟来说完全自己实现新的功能难度有点大，还是决定先用DPCNN试试，顺便就开始学习使用Keras了。今天就不刷题了，下午已经大概看了看资料了，明天白天把DPCNN的理论部分内容再记录一下。<br>
+block的个数是自己定义的，之前一直没明白，看别人跑的都不太一样，一直没理解，现在终于明白了！为什么叫DPCNN（Deep Pyramid CNN）？因为每个block都会使序列变短（maxpooling），序列能够获取更多的邻近信息，像是金字塔形状，最终做分类只需再加上softmax就可以了！<br>
+<img src="https://img-blog.csdnimg.cn/20190625222738996.png" alt="在这里插入图片描述"></p>
+<br>
+<hr class="footnotes-sep">
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn1" class="footnote-item"><p>https://yq.aliyun.com/articles/342508 一文读懂「Attention is All You Need」| 附代码实现 <a href="#fnref1" class="footnote-backref">↩︎</a></p>
+</li>
+<li id="fn2" class="footnote-item"><p>https://blog.csdn.net/qq_41664845/article/details/84969266 图解Transformer <a href="#fnref2" class="footnote-backref">↩︎</a></p>
+</li>
+</ol>
+</section>
+</div>
+</body>
+
+</html>

@@ -1,0 +1,106 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NLP经典模型</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><p>NLP方向的经典模型。因为之前的简单些的模型已经调好了，所以需要做一些改进来提高准确率，会从分词，embedding层和模型三个方面着手处理。先看看有哪些经典的模型，就像图像领域的VGG、fast rcnn、Alexnet等业界公认的有效的模型框架。</p>
+<blockquote>
+<p>主要参考：https://blog.csdn.net/u012052268/article/details/80698930 12个NLP分类模型</p>
+</blockquote>
+<p><img src="https://img-blog.csdnimg.cn/20190624091739310.png" alt="在这里插入图片描述"><br>
+这是别人对文本分类模型在某个300W数据集上的运行效果<sup class="footnote-ref"><a href="#fn1" id="fnref1">1</a></sup>。<br>
+<br></p>
+<h1><a id="FastText_6"></a>FastText</h1>
+<h4><a id="_7"></a>介绍</h4>
+<blockquote>
+<p>https://www.sohu.com/a/219080991_129720 FastText原理和实践</p>
+</blockquote>
+<h5><a id="word2vec_11"></a>word2vec</h5>
+<p>  word2vec主要有skip-gram和CBOW。<br>
+　　CBOW的主要功能是根据上下文词汇预测目标词汇。输入层输入上下文的one-hot，输出也是预测词的one-hot。因为one-hot矩阵的预测结果很多，所以softmax部分使用的是霍夫曼树softmax。具体前项后项传播过程在上面的网址中有具体推导。<br>
+　　word2vec的CBOW模型架构和fastText模型非常相似。一般情况下，使用fastText进行文本分类的同时也会产生词的embedding，即embedding是fastText分类的产物。除非你决定使用预训练的embedding来训练fastText分类模型，这另当别论。<br>
+　　在传统的word2vec中，把语料中的单词作为最小单位，会为每个单词产生一个向量。这忽略了单词内部的形态特征，比如：“apple” 和“apples”，“达观数据”和“达观”，这两个例子中，两个单词都有较多公共字符，即它们的内部形态类似，但是在传统的word2vec中，这种单词内部形态信息因为它们被转换成不同的id丢失了。<br>
+<img src="https://img-blog.csdnimg.cn/20190624101040340.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+优点：</p>
+<ul>
+<li>对于低频词生成的词向量效果会更好。因为它们的n-gram可以和其它词共享。</li>
+<li>对于训练词库之外的单词，仍然可以构建它们的词向量。我们可以叠加它们的字符级n-gram向量。<br>
+<br></li>
+</ul>
+<p>模型框架<br>
+<img src="https://img-blog.csdnimg.cn/20190624101640631.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+　　fastText的输入是多个单词及其n-gram特征，这些特征用来表示单个文档的类别。值得注意的是，fastText在输入时，将单词的字符级别的n-gram向量作为额外的特征；在输出时，fastText采用了分层Softmax，大大降低了模型训练时间。</p>
+<h4><a id="_25"></a>总结</h4>
+<p><strong>于是fastText的核心思想就是：将整篇文档的词及n-gram向量叠加平均得到文档向量(上图中hidden层，不是训练而是叠加平均)，然后使用文档向量做softmax多分类。这中间涉及到两个技巧：字符级n-gram特征的引入以及分层Softmax分类。</strong><br>
+　　1. 层级简单 + embedding叠加 + 分层Softmax(速度快的原因)<br>
+　　2. 字符级别的n-gram(准确的原因)<br>
+<br></p>
+<h1><a id="Text_CNN_30"></a>Text CNN</h1>
+<p><img src="https://img-blog.csdnimg.cn/20190624111616612.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+在Text CNN中，使用padding固定句子长度，通过embedding固定词向量长度，即输入矩阵是固定大小的。卷积层的核函数大小d与输入矩阵d相同。最终映射的结果的维度根据实际情况设定，上图是一个二分类的映射。<br>
+<br></p>
+<h1><a id="Text_RNN_34"></a>Text RNN</h1>
+<p>  CNN有个最大问题是固定 filter_size 的视野，一方面无法建模更长的序列信息，另一方面 filter _size 的超参调节也很繁琐。CNN本质是做文本的特征表达工作，而自然语言处理中更常用的是递归神经网络（RNN, Recurrent Neural Network），能够更好的表达上下文信息。</p>
+<p><img src="https://img-blog.csdnimg.cn/20190624112258313.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+模型结构：embedding—&gt;bi-drectional lstm —&gt; concat output –&gt;average—–&gt; softmax layer。 contact output指的是节点的输出。<br>
+<br></p>
+<h1><a id="BiLstm_Text_Relation_LSTM_40"></a>BiLstm Text Relation 双向LSTM文本关系</h1>
+<p>  结构与Text RNN相同。但输入是被特别设计，直接把两个句子进行拼接。<br>
+<br></p>
+<h1><a id="two_CNN_Text_Relation_43"></a>two CNN Text Relation</h1>
+<br>
+<h1><a id="BiLstm_Text_Relation_Two_RNN_46"></a>BiLstm Text Relation Two RNN</h1>
+<br>
+<h1><a id="textRCNN__49"></a>text-RCNN 循环卷积神经网络</h1>
+<p>  这里的RCNN和常用与目标检测的R-CNN、fast r-cnn等不同，这里的RCNN指的是：一般的 CNN 网络，都是卷积层 + 池化层。这里是将卷积层换成了双向 RNN，所以结果是，两向 RNN + 池化层。就有那么点 RCNN 的味道。因为CNN卷积层是将wi-1,wi,wi+1与卷积核操作得到输出yi，这里RCNN使用wi和wi前向的[w0,wi-1]，以及wi的后向的[wi+1,wn]得到输出yi，只不过这里不是直接使用上个时刻和下个时刻的值(上下文单词)，而是经过RNN处理过后的内容，然后经过池化层。<img src="https://img-blog.csdnimg.cn/2019062412423616.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+  上图就是RCNN的结构图，据说效果一般，速度也不够快。<br>
+　　既然已经提到了，就顺便说下R-CNN：R-CNN主要用来做目标检测，借鉴了滑动窗口思想，R-CNN 采用对区域进行识别的方案<sup class="footnote-ref"><a href="#fn2" id="fnref2">2</a></sup>。具体是：</p>
+<ul>
+<li>给定一张输入图片，从图片中提取 2000 个类别独立的候选区域。</li>
+<li>对于每个区域利用 CNN 抽取一个固定长度的特征向量。</li>
+<li>再对每个区域利用 SVM 进行目标分类。<br>
+<img src="https://img-blog.csdnimg.cn/20190624124652208.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+　　总的来说就是：产生分块，然后每个分块独立的通过CNN网络提取特征，最后输出固定大小的特征向量，然后SVM分类。分块的方法很多，比如selective search、multi-scale combinatorial grouping等等等，就不一一介绍了。<br>
+<br></li>
+</ul>
+<h1><a id="Hierarchical_Attention_Networks_3_59"></a>Hierarchical Attention Networks 分层注意力模型<sup class="footnote-ref"><a href="#fn3" id="fnref3">3</a></sup></h1>
+<p>  分层注意力模型会对文章和句子中的某些内容增加重要性，即“注意力”集中在某些词句上。首先对于一篇文档来说，会分为哪些句子应该给予更多的“注意力”，在每个句子中，同样也会决定给予哪些词更多的“注意力”，其实感觉比较像找出最具代表性的词句，参考这些去判断语料的属性。最早用于机器翻译，然后也应用于分类、对话系统等。网络结构：<br>
+<img src="https://img-blog.csdnimg.cn/20190624135537750.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+  通过上面的框架可以观察到，首先是词层面的注意力机制，先将分词w嵌入，然后经过双向LSTM网络输出为h。此时，考虑到不是每个词对于分类任务都是足够重要的，比如在做文本的情绪分类时，可能我们就会比较关注“很好”、“伤感”这些词。为了能使循环神经网络也能自动将“注意力”放在这些词汇上，作者设计了基于单词的注意力模型：将h经过一个线性层变换(tanh(wh+b))，然后通过softmax公式计算出每个单词的重要性(即每个单词的权重)，最后通过对双向RNN的输出进行加权平均得到每个句子的表示。句子层面的注意力机制与词的类似，输入是将词加权后的句子作为输入。最终经过多分类softmax对语料分类。<br>
+<br></p>
+<h1><a id="seq2seq4__attention_64"></a>seq2seq<sup class="footnote-ref"><a href="#fn4" id="fnref4">4</a></sup> + attention</h1>
+<p>encoder to decoder<br>
+<img src="https://img-blog.csdnimg.cn/20190624144048221.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+引入Attention机制后：<br>
+<img src="https://img-blog.csdnimg.cn/20190624144418883.png?x-oss-process=image/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L3FxXzQwMTQ0MDM2,size_16,color_FFFFFF,t_70" alt="在这里插入图片描述"><br>
+　　加入Attention注意力分配的机制后<sup class="footnote-ref"><a href="#fn5" id="fnref5">5</a></sup>，与seq2seq的不同主要体现在中间编码C。seq2seq中，Encoder将输入句子编码为C是指context vector。context vector可以想成是一个含有所有输入句信息的向量，也就是Encoder当中，最后一个hidden state。简单来说，Encoder将输入句压缩成固定长度的context vector，context vector即可完整表达输入句，再透过Decoder将context vector内的信息产生输出句。但是问题在于，如果句子很长，就会出现信息丢失的问题，因为只有一个context vector。<br>
+　　attention model用来帮助解决机器翻译在句子过长时效果不佳的问题。这个架构在encoder时对每个输入词都创造一个context vector，这样不容易丢失信息，decoder会更好的译码。<br>
+　　Context vector c_{i}是通过attention score乘上输入序列加权求和。attention score可以用来衡量输入句中的每个词对目标句中的每个词的重要性。<br>
+　　带Attention的seq2seq模型是解决序列生成问题的典型模型，如翻译、对话系统。<br>
+<br></p>
+<br>
+<hr class="footnotes-sep">
+<section class="footnotes">
+<ol class="footnotes-list">
+<li id="fn1" class="footnote-item"><p>https://blog.csdn.net/u012052268/article/details/80698930 12个NLP分类模型 <a href="#fnref1" class="footnote-backref">↩︎</a></p>
+</li>
+<li id="fn2" class="footnote-item"><p>https://blog.csdn.net/briblue/article/details/82012575 【深度学习】R-CNN 论文解读及个人理解 <a href="#fnref2" class="footnote-backref">↩︎</a></p>
+</li>
+<li id="fn3" class="footnote-item"><p>https://blog.csdn.net/qq_24305433/article/details/80427159 多层注意力模型：Hierarchical Attention Networks for Document Classification <a href="#fnref3" class="footnote-backref">↩︎</a></p>
+</li>
+<li id="fn4" class="footnote-item"><p>https://blog.csdn.net/qq_32241189/article/details/81591456 NLP之Seq2Seq <a href="#fnref4" class="footnote-backref">↩︎</a></p>
+</li>
+<li id="fn5" class="footnote-item"><p>https://www.sohu.com/a/258263183_505915 从Seq2seq到Attention模型到Self Attention（一） <a href="#fnref5" class="footnote-backref">↩︎</a></p>
+</li>
+</ol>
+</section>
+</div>
+</body>
+
+</html>

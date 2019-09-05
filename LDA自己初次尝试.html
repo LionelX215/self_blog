@@ -1,0 +1,74 @@
+﻿<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LDA自己初次尝试</title>
+  <link rel="stylesheet" href="https://stackedit.io/style.css" />
+</head>
+
+<body class="stackedit">
+  <div class="stackedit__html"><p>想用LDA对unsupervised数据添加label，用了词袋和tfidf，效果都不能够令人满意。查资料有说LDA模型对比较短的语料效果不够好，想了一下应该是因为是NB所以对长语料的决策能够更准确，短语料能够获得的信息量还是太少了。记录一下代码，下一步准备用人工+DPCNN的方法尝试添加Label。<br>
+<br></p>
+<pre><code class="prism language-python"><span class="token keyword">import</span> pymysql
+<span class="token keyword">import</span> numpy <span class="token keyword">as</span> np
+<span class="token keyword">import</span> pandas <span class="token keyword">as</span> pd
+<span class="token keyword">import</span> gensim
+<span class="token keyword">from</span> gensim <span class="token keyword">import</span> models<span class="token punctuation">,</span> corpora<span class="token punctuation">,</span> similarities
+<span class="token keyword">import</span> re
+<span class="token keyword">import</span> jieba
+
+
+<span class="token keyword">def</span> <span class="token function">clean_text</span><span class="token punctuation">(</span>text<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    text <span class="token operator">=</span> re<span class="token punctuation">.</span>sub<span class="token punctuation">(</span>r<span class="token string">'[^\u4e00-\u9fa50-9]'</span><span class="token punctuation">,</span> <span class="token string">''</span><span class="token punctuation">,</span> text<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> text
+
+<span class="token keyword">def</span> <span class="token function">cut_sentence</span><span class="token punctuation">(</span>text<span class="token punctuation">,</span> stop_word<span class="token punctuation">)</span><span class="token punctuation">:</span>
+    res <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token punctuation">]</span>
+    <span class="token keyword">for</span> i <span class="token keyword">in</span> text<span class="token punctuation">:</span>
+        cut_list <span class="token operator">=</span> <span class="token punctuation">[</span>word <span class="token keyword">for</span> word <span class="token keyword">in</span> jieba<span class="token punctuation">.</span>cut<span class="token punctuation">(</span>i<span class="token punctuation">)</span> <span class="token keyword">if</span> word <span class="token operator">not</span> <span class="token keyword">in</span> stop_word<span class="token punctuation">]</span>
+        res<span class="token punctuation">.</span>append<span class="token punctuation">(</span>cut_list<span class="token punctuation">)</span>
+    <span class="token keyword">return</span> res
+
+stop_list <span class="token operator">=</span> <span class="token punctuation">[</span><span class="token string">'的'</span><span class="token punctuation">,</span><span class="token string">'了'</span><span class="token punctuation">,</span><span class="token string">'得'</span><span class="token punctuation">,</span><span class="token string">'也'</span><span class="token punctuation">,</span><span class="token string">'是'</span><span class="token punctuation">,</span><span class="token string">'你'</span><span class="token punctuation">,</span><span class="token string">'我'</span><span class="token punctuation">,</span><span class="token string">'他'</span><span class="token punctuation">,</span><span class="token string">'她'</span><span class="token punctuation">,</span><span class="token string">'它'</span><span class="token punctuation">,</span><span class="token string">'很'</span><span class="token punctuation">,</span><span class="token string">'说'</span><span class="token punctuation">,</span><span class="token string">'就'</span><span class="token punctuation">,</span>
+             <span class="token string">'都'</span><span class="token punctuation">,</span><span class="token string">'在'</span><span class="token punctuation">,</span><span class="token string">'还'</span><span class="token punctuation">,</span><span class="token string">'酒店'</span><span class="token punctuation">,</span><span class="token string">'有'</span><span class="token punctuation">,</span><span class="token string">'给'</span><span class="token punctuation">,</span><span class="token string">'住'</span><span class="token punctuation">,</span><span class="token string">'我们'</span><span class="token punctuation">,</span><span class="token string">'和'</span><span class="token punctuation">,</span><span class="token string">'到'</span><span class="token punctuation">,</span><span class="token string">'前台'</span><span class="token punctuation">]</span>
+
+conn <span class="token operator">=</span> pymysql<span class="token punctuation">.</span>connect<span class="token punctuation">(</span>host<span class="token operator">=</span><span class="token string">'47.99.135.37'</span><span class="token punctuation">,</span> user<span class="token operator">=</span><span class="token string">'gmp'</span><span class="token punctuation">,</span> password<span class="token operator">=</span><span class="token string">'gmp1234'</span><span class="token punctuation">,</span>
+                       db<span class="token operator">=</span><span class="token string">'hotel'</span><span class="token punctuation">,</span> charset<span class="token operator">=</span><span class="token string">'utf8'</span><span class="token punctuation">)</span>
+
+sql_1 <span class="token operator">=</span> <span class="token string">"select * from hotel_comments_elong where comment_score between 0.1 and 3.5 limit 2000000"</span>
+sql_2 <span class="token operator">=</span> <span class="token string">"select * from hotel_comments_elong where comment_score between 3.6 and 5.1 limit 300000"</span>
+
+df1 <span class="token operator">=</span> pd<span class="token punctuation">.</span>read_sql<span class="token punctuation">(</span>sql<span class="token operator">=</span>sql_1<span class="token punctuation">,</span>con<span class="token operator">=</span>conn<span class="token punctuation">)</span>
+df2 <span class="token operator">=</span> pd<span class="token punctuation">.</span>read_sql<span class="token punctuation">(</span>sql<span class="token operator">=</span>sql_2<span class="token punctuation">,</span>con<span class="token operator">=</span>conn<span class="token punctuation">)</span>
+conn<span class="token punctuation">.</span>close<span class="token punctuation">(</span><span class="token punctuation">)</span>
+temp <span class="token operator">=</span> pd<span class="token punctuation">.</span>concat<span class="token punctuation">(</span><span class="token punctuation">[</span>df1<span class="token punctuation">,</span>df2<span class="token punctuation">]</span><span class="token punctuation">,</span> axis<span class="token operator">=</span><span class="token number">0</span><span class="token punctuation">,</span> ignore_index<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+df <span class="token operator">=</span> temp<span class="token punctuation">.</span>sample<span class="token punctuation">(</span>frac<span class="token operator">=</span><span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">.</span>reset_index<span class="token punctuation">(</span>drop<span class="token operator">=</span><span class="token boolean">True</span><span class="token punctuation">)</span>
+corpus <span class="token operator">=</span> df<span class="token punctuation">[</span><span class="token string">'comment_content'</span><span class="token punctuation">]</span>
+docs <span class="token operator">=</span> corpus<span class="token punctuation">.</span><span class="token builtin">apply</span><span class="token punctuation">(</span><span class="token keyword">lambda</span> s<span class="token punctuation">:</span>clean_text<span class="token punctuation">(</span>s<span class="token punctuation">)</span><span class="token punctuation">)</span>
+doclist <span class="token operator">=</span> docs<span class="token punctuation">.</span>values
+token <span class="token operator">=</span> cut_sentence<span class="token punctuation">(</span>doclist<span class="token punctuation">,</span> stop_list<span class="token punctuation">)</span>
+<span class="token comment"># 到此输出的是完成好的分词</span>
+
+
+
+
+<span class="token comment"># 然后字典</span>
+dictionary <span class="token operator">=</span> corpora<span class="token punctuation">.</span>Dictionary<span class="token punctuation">(</span>token<span class="token punctuation">)</span>
+<span class="token comment"># (x,y)化的语料</span>
+input_corpus <span class="token operator">=</span> <span class="token punctuation">[</span>dictionary<span class="token punctuation">.</span>doc2bow<span class="token punctuation">(</span>text<span class="token punctuation">)</span> <span class="token keyword">for</span> text <span class="token keyword">in</span> token<span class="token punctuation">]</span>
+tfidf <span class="token operator">=</span> models<span class="token punctuation">.</span>TfidfModel<span class="token punctuation">(</span>input_corpus<span class="token punctuation">)</span>     <span class="token comment"># fit models	tfidf</span>
+corpus_tfidf <span class="token operator">=</span> tfidf<span class="token punctuation">[</span>input_corpus<span class="token punctuation">]</span>      <span class="token comment"># apply model to all cprpus	 tfi</span>
+lda <span class="token operator">=</span> gensim<span class="token punctuation">.</span>models<span class="token punctuation">.</span>ldamodel<span class="token punctuation">.</span>LdaModel<span class="token punctuation">(</span>corpus<span class="token operator">=</span>corpus_tfidf<span class="token punctuation">,</span> id2word<span class="token operator">=</span>dictionary<span class="token punctuation">,</span> num_topics<span class="token operator">=</span><span class="token number">6</span><span class="token punctuation">)</span>
+<span class="token comment"># lda = gensim.models.ldamodel.LdaModel(corpus=input_corpus, id2word=dictionary, num_topics=6)</span>
+lda<span class="token punctuation">.</span>print_topics<span class="token punctuation">(</span>num_topics<span class="token operator">=</span><span class="token number">5</span><span class="token punctuation">,</span> num_words<span class="token operator">=</span><span class="token number">10</span><span class="token punctuation">)</span>
+</code></pre>
+<blockquote>
+<p>[(1, ‘0.026*“离” + 0.025*“方便” + 0.019*“近” + 0.019*“西湖” + 0.014*“很近” + 0.012*“方面” + 0.011*“不错” + 0.011*“吃饭” + 0.011*“位置” + 0.011*“各”’), (0, ‘0.008*“房间” + 0.006*“不” + 0.006*“没有” + 0.006*“免费” + 0.006*“升级” + 0.005*“还有” + 0.004*“就是” + 0.004*“不错” + 0.004*“早餐” + 0.004*“好”’), (5, ‘0.018*“每次” + 0.017*“这里” + 0.012*“来” + 0.012*“一直” + 0.012*“出差” + 0.010*“这个” + 0.010*“喜欢” + 0.010*“不错” + 0.009*“这家” + 0.009*“啊”’), (3, ‘0.041*“下次” + 0.029*“还会” + 0.021*“来” + 0.020*“再” + 0.019*“入住” + 0.017*“选择” + 0.015*“好” + 0.013*“非常” + 0.012*“不错” + 0.012*“服务”’), (2, ‘0.020*“可以” + 0.018*“有点” + 0.017*“一般” + 0.016*“好好” + 0.016*“就是” + 0.013*“不错” + 0.012*“设施” + 0.012*“房间” + 0.012*“早餐” + 0.011*“比较”’)]</p>
+</blockquote>
+<p>想要的是能够将优点输出，缺点输出，但是达不到这样的目的。</p>
+</div>
+</body>
+
+</html>
